@@ -1,0 +1,16 @@
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+
+# Claude Code project MCP config — contains eToro API keys
+.mcp.json
+.mcp.json.bak
+
+# Local (per-machine) Claude Code settings
+.claude/settings.local.json
+.claude/settings.json
+
+# Agent memory — personal working state, local only (template stays tracked)
+memory/*
+!memory/MEMORY.md.example

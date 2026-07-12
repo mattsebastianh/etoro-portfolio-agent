@@ -1,0 +1,22 @@
+# Memory Index
+
+One line per memory file, newest first. Each memory is one markdown file in
+this directory holding a single durable fact (a validated bug workaround, an
+alert level the user set, a design decision), with frontmatter:
+
+```markdown
+---
+name: short-kebab-case-slug
+description: one-line summary used to decide relevance during recall
+metadata:
+  type: user | feedback | project | reference
+---
+
+The fact. For feedback/project entries, follow with **Why:** and
+**How to apply:** lines. Link related memories with [[their-name]].
+```
+
+Example index entries:
+
+- [eToro rates multi-ID quirk](etoro-rates-quirk.md) — batch endpoint is last-wins; fetch per-ID and merge
+- [BTC alert level](btc-alert-60k.md) — alert the user if BTC < 60k, set 2026-01-15

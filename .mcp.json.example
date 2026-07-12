@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "etoro": {
+      "type": "stdio",
+      "command": "/absolute/path/to/etoro-portfolio-agent/etoro-mcp/.venv/bin/python3",
+      "args": ["/absolute/path/to/etoro-portfolio-agent/etoro-mcp/server.py"],
+      "env": {
+        "ETORO_API_KEY": "YOUR_PUBLIC_API_KEY",
+        "ETORO_USER_KEY": "YOUR_USER_KEY",
+        "ETORO_MODE": "demo",
+        "ETORO_ENABLE_TRADING": "false"
+      }
+    }
+  }
+}

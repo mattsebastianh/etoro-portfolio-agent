@@ -1,5 +1,10 @@
 # eTRADER — eToro Portfolio Agent
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.14+](https://img.shields.io/badge/Python-3.14%2B-blue.svg)](etoro-mcp/requirements.txt)
+[![MCP](https://img.shields.io/badge/MCP-stdio%20server-6f42c1.svg)](https://modelcontextprotocol.io)
+[![Claude Code](https://img.shields.io/badge/Claude%20Code-project-b16fda.svg)](https://claude.com/claude-code)
+
 A personal eToro portfolio agent for [Claude Code](https://claude.com/claude-code), backed by a local Python MCP server that wraps the [eToro Public API](https://api-portal.etoro.com). Track positions, analyze instruments, manage risk, and execute confirmation-gated trades — all from a Claude Code session.
 
 ## How it works

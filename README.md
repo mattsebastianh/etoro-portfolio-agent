@@ -70,6 +70,7 @@ Start Claude Code in the project directory and talk to it in plain language:
 | `.mcp.json.example` | Key-free config template |
 | `install-etoro-mcp.sh` | One-shot installer |
 | `memory/` | Agent memory — one fact per file, indexed in `memory/MEMORY.md` (local-only; see `memory/MEMORY.md.example`) |
+| `CHANGELOG.md` | Notable changes, feature by feature |
 
 ## Contributing
 

@@ -65,6 +65,86 @@ def _info_base() -> str:
     return f"/api/v1/trading/info/{MODE}"
 
 
+# ------------------------------------------------- Instrument name resolution
+# The trading endpoints return bare instrument IDs. We look the IDs up once via
+# market-data/search and splice the ticker + display name into every object that
+# carries one, so responses read as "AAPL / Apple" instead of "1001".
+
+_NAME_CACHE: dict[int, dict[str, Any]] = {}
+
+# Key spellings eToro uses for an instrument ID across its endpoints.
+_ID_KEYS = ("instrumentid", "instrumentids")
+
+
+async def _load_names(ids: set[int]) -> None:
+    """Fetch and cache ticker/display name for any IDs not already cached."""
+    missing = sorted(i for i in ids if i not in _NAME_CACHE)
+    for start in range(0, len(missing), 50):
+        chunk = missing[start:start + 50]
+        # The search endpoint accepts a comma-separated instrumentId list;
+        # pageSize must cover the chunk or the tail is silently dropped.
+        data = await _request("GET", "/api/v1/market-data/search",
+                              params={"instrumentId": ",".join(str(i) for i in chunk),
+                                      "pageSize": len(chunk)})
+        items = data.get("items") if isinstance(data, dict) else None
+        for item in items or []:
+            iid = item.get("internalInstrumentId")
+            if isinstance(iid, int):
+                _NAME_CACHE[iid] = {
+                    "symbol": item.get("internalSymbolFull"),
+                    "name": item.get("internalInstrumentDisplayName"),
+                }
+        # IDs the search doesn't know about are cached as unknown so we don't
+        # re-request them on every call.
+        for iid in chunk:
+            _NAME_CACHE.setdefault(iid, {})
+
+
+def _walk_ids(node: Any, found: set[int]) -> None:
+    if isinstance(node, dict):
+        for key, value in node.items():
+            if key.lower() in _ID_KEYS and isinstance(value, int) and not isinstance(value, bool):
+                found.add(value)
+            else:
+                _walk_ids(value, found)
+    elif isinstance(node, list):
+        for value in node:
+            _walk_ids(value, found)
+
+
+def _annotate(node: Any) -> Any:
+    if isinstance(node, dict):
+        out: dict[str, Any] = {}
+        for key, value in node.items():
+            if key.lower() in _ID_KEYS and isinstance(value, int) and not isinstance(value, bool):
+                out[key] = value
+                meta = _NAME_CACHE.get(value) or {}
+                if meta.get("symbol"):
+                    out["symbol"] = meta["symbol"]
+                if meta.get("name"):
+                    out["instrumentName"] = meta["name"]
+            else:
+                out[key] = _annotate(value)
+        return out
+    if isinstance(node, list):
+        return [_annotate(v) for v in node]
+    return node
+
+
+async def _with_names(data: Any) -> Any:
+    """Add `symbol` + `instrumentName` next to every instrument ID in a response.
+
+    The numeric ID is kept, because the trading tools take it as an argument."""
+    if isinstance(data, dict) and "error" in data:
+        return data
+    ids: set[int] = set()
+    _walk_ids(data, ids)
+    if not ids:
+        return data
+    await _load_names(ids)
+    return _annotate(data)
+
+
 # ---------------------------------------------------------------- Identity
 
 @mcp.tool()
@@ -77,29 +157,34 @@ async def get_profile() -> Any:
 
 @mcp.tool()
 async def get_portfolio() -> Any:
-    """Aggregated portfolio snapshot (demo or real mode depending on ETORO_MODE)."""
-    return await _request("GET", f"{_info_base()}/aggregate-portfolio")
+    """Aggregated portfolio snapshot (demo or real mode depending on ETORO_MODE).
+    Each holding carries its ticker and name alongside the instrument ID."""
+    return await _with_names(await _request("GET", f"{_info_base()}/aggregate-portfolio"))
 
 
 @mcp.tool()
 async def get_pnl() -> Any:
-    """Account PnL and portfolio detail (positions, orders, mirrors)."""
-    return await _request("GET", f"{_info_base()}/pnl")
+    """Account PnL and portfolio detail (positions, orders, mirrors), with
+    ticker and name resolved for every instrument ID."""
+    return await _with_names(await _request("GET", f"{_info_base()}/pnl"))
 
 
 @mcp.tool()
 async def get_positions() -> Any:
-    """Open positions and pending orders (via the PnL endpoint, which includes them)."""
-    return await _request("GET", f"{_info_base()}/pnl")
+    """Open positions and pending orders (via the PnL endpoint, which includes them),
+    with ticker and name resolved for every instrument ID."""
+    return await _with_names(await _request("GET", f"{_info_base()}/pnl"))
 
 
 @mcp.tool()
 async def get_trading_history(min_date: str = "", page: int = 1, page_size: int = 50) -> Any:
-    """History of closed trades. min_date: YYYY-MM-DD (default: 90 days ago)."""
+    """History of closed trades, with ticker and name resolved for every instrument ID.
+    min_date: YYYY-MM-DD (default: 90 days ago)."""
     if not min_date:
         min_date = (date.today() - timedelta(days=90)).isoformat()
-    return await _request("GET", f"/api/v1/trading/info/trade/{MODE}/history",
-                          params={"minDate": min_date, "page": page, "pageSize": page_size})
+    return await _with_names(
+        await _request("GET", f"/api/v1/trading/info/trade/{MODE}/history",
+                       params={"minDate": min_date, "page": page, "pageSize": page_size}))
 
 
 @mcp.tool()
@@ -175,7 +260,7 @@ async def get_rates(instrument_ids: str) -> Any:
             return data
         if isinstance(data, dict) and data.get("rates"):
             rates.extend(data["rates"])
-    return {"rates": rates}
+    return await _with_names({"rates": rates})
 
 
 @mcp.tool()
